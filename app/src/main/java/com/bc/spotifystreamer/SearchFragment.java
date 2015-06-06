@@ -47,6 +47,10 @@ public class SearchFragment extends Fragment {
         RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getActivity());
         recyclerView.setLayoutManager(layoutManager);
 
+        if(savedInstanceState != null){
+            searchAdapter.mDataset = (ArrayList)savedInstanceState.get("mDataSet");
+        }
+
         final EditText searchText = (EditText)rootView.findViewById(R.id.search_text);
         searchText.setOnKeyListener(new View.OnKeyListener() {
             @Override
@@ -63,6 +67,12 @@ public class SearchFragment extends Fragment {
         });
 
         return rootView;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelableArrayList("mDataSet", (ArrayList)searchAdapter.mDataset);
     }
 
     private void updateSpotifyArtist(final String artistName){
@@ -125,6 +135,13 @@ public class SearchFragment extends Fragment {
 
         public void removeAll(){
             mDataset.removeAll(mDataset);
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    notifyDataSetChanged();
+                }
+            });
+
         }
 
         @Override
@@ -139,7 +156,8 @@ public class SearchFragment extends Fragment {
             final Artist artist = mDataset.get(position);
 
             if(artist.images.size() > 0){
-                String imageUrl = artist.images.get(0).url;
+                int imageToUse = artist.images.size() - 1;
+                String imageUrl = artist.images.get(imageToUse).url;
                 Picasso.with(getActivity()).load(imageUrl).into(holder.artistPicture);
             }
 
