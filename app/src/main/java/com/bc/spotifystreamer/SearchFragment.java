@@ -3,19 +3,34 @@ package com.bc.spotifystreamer;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import com.squareup.picasso.Picasso;
+
+import java.util.ArrayList;
+
+import kaaes.spotify.webapi.android.SpotifyApi;
+import kaaes.spotify.webapi.android.SpotifyService;
+import kaaes.spotify.webapi.android.models.Artist;
+import kaaes.spotify.webapi.android.models.ArtistsPager;
+import retrofit.Callback;
+import retrofit.RetrofitError;
+import retrofit.client.Response;
 
 /**
  * A placeholder fragment containing a simple view.
  */
 public class SearchFragment extends Fragment {
+    SearchAdapter searchAdapter;
 
     public SearchFragment() {
     }
@@ -26,8 +41,11 @@ public class SearchFragment extends Fragment {
         View rootView = inflater.inflate(R.layout.fragment_search, container);
 
         RecyclerView recyclerView = (RecyclerView)rootView.findViewById(R.id.search_results_recyclerview);
-        SearchAdapter searchAdapter = new SearchAdapter();
+        searchAdapter = new SearchAdapter(new ArrayList<Artist>());
         recyclerView.setAdapter(searchAdapter);
+
+        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getActivity());
+        recyclerView.setLayoutManager(layoutManager);
 
         final EditText searchText = (EditText)rootView.findViewById(R.id.search_text);
         searchText.setOnKeyListener(new View.OnKeyListener() {
@@ -47,36 +65,91 @@ public class SearchFragment extends Fragment {
         return rootView;
     }
 
-    private void updateSpotifyArtist(String artistName){
-        Log.v("Spotify", artistName);
+    private void updateSpotifyArtist(final String artistName){
+        SpotifyApi api = new SpotifyApi();
+
+        SpotifyService spotifyService = api.getService();
+        spotifyService.searchArtists(artistName, new Callback<ArtistsPager>() {
+            @Override
+            public void success(ArtistsPager artistsPager, Response response) {
+                //List artistList = artistsPager.artists.items;
+                searchAdapter.removeAll();
+                for(int i = 0; i < artistsPager.artists.items.size(); i++){
+                    searchAdapter.add(i, artistsPager.artists.items.get(i));
+                }
+            }
+
+            @Override
+            public void failure(RetrofitError error) {
+
+            }
+        });
     }
 
     private class ViewHolder extends RecyclerView.ViewHolder {
+        private TextView artistName;
+        private ImageView artistPicture;
 
         public ViewHolder(View itemView) {
             super(itemView);
+            artistName = (TextView) itemView.findViewById(R.id.artist_name);
+            artistPicture = (ImageView) itemView.findViewById(R.id.artist_image);
         }
     }
 
     private class SearchAdapter extends RecyclerView.Adapter<ViewHolder> {
+        private ArrayList<Artist> mDataset;
 
-        public SearchAdapter() {
+        public SearchAdapter(ArrayList<Artist> dataSet) {
             super();
+            mDataset = dataSet;
+        }
+
+        public void add(final int position, Artist artist) {
+            mDataset.add(position, artist);
+
+
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    notifyItemInserted(position);
+                }
+            });
+        }
+
+        public void remove(Artist artist){
+            int position = mDataset.indexOf(artist);
+            mDataset.remove(position);
+            notifyItemRemoved(position);
+        }
+
+        public void removeAll(){
+            mDataset.removeAll(mDataset);
         }
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return null;
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.search_song, parent, false);
+            ViewHolder viewHolder = new ViewHolder(view);
+            return viewHolder;
         }
 
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
+            final Artist artist = mDataset.get(position);
+
+            if(artist.images.size() > 0){
+                String imageUrl = artist.images.get(0).url;
+                Picasso.with(getActivity()).load(imageUrl).into(holder.artistPicture);
+            }
+
+            holder.artistName.setText(artist.name);
 
         }
 
         @Override
         public int getItemCount() {
-            return 0;
+            return mDataset.size();
         }
     }
 }
