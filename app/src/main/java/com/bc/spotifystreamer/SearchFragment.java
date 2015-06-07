@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,7 +42,7 @@ public class SearchFragment extends Fragment {
         View rootView = inflater.inflate(R.layout.fragment_search, container);
 
         RecyclerView recyclerView = (RecyclerView)rootView.findViewById(R.id.search_results_recyclerview);
-        searchAdapter = new SearchAdapter(new ArrayList<Artist>());
+        searchAdapter = new SearchAdapter(new ArrayList<SearchArtist>());
         recyclerView.setAdapter(searchAdapter);
 
         RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getActivity());
@@ -76,6 +77,8 @@ public class SearchFragment extends Fragment {
     }
 
     private void updateSpotifyArtist(final String artistName){
+        searchAdapter.removeAll();
+
         SpotifyApi api = new SpotifyApi();
 
         SpotifyService spotifyService = api.getService();
@@ -83,9 +86,24 @@ public class SearchFragment extends Fragment {
             @Override
             public void success(ArtistsPager artistsPager, Response response) {
                 //List artistList = artistsPager.artists.items;
-                searchAdapter.removeAll();
-                for(int i = 0; i < artistsPager.artists.items.size(); i++){
-                    searchAdapter.add(i, artistsPager.artists.items.get(i));
+                for (int i = 0; i < artistsPager.artists.items.size(); i++) {
+                    Artist artist = artistsPager.artists.items.get(i);
+
+                    //Get the index of the second largest image (always returned by the API as count - 1)
+                    if (artist.images.size() > 0) {
+                        SearchArtist searchArtist = new SearchArtist(artist.name,
+                                artist.id,
+                                artist.images.get(0).url
+                        );
+                        searchAdapter.add(i, searchArtist);
+                    } else {
+                        SearchArtist searchArtist = new SearchArtist(artist.name,
+                                artist.id
+                        );
+                        searchAdapter.add(i, searchArtist);
+                    }
+
+                    Log.v("log", artist.name);
                 }
             }
 
@@ -108,39 +126,43 @@ public class SearchFragment extends Fragment {
     }
 
     private class SearchAdapter extends RecyclerView.Adapter<ViewHolder> {
-        private ArrayList<Artist> mDataset;
+        private ArrayList<SearchArtist> mDataset;
 
-        public SearchAdapter(ArrayList<Artist> dataSet) {
+        public SearchAdapter(ArrayList<SearchArtist> dataSet) {
             super();
+
+            //Set the dataset to the dataset passed in the constructor
             mDataset = dataSet;
         }
 
-        public void add(final int position, Artist artist) {
+        public void add(final int position, SearchArtist artist) {
             mDataset.add(position, artist);
 
-
+            //Notify the view that the dataset has changed
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    Log.e("Log","item inserted");
                     notifyItemInserted(position);
                 }
             });
         }
 
-        public void remove(Artist artist){
-            int position = mDataset.indexOf(artist);
-            mDataset.remove(position);
-            notifyItemRemoved(position);
-        }
-
         public void removeAll(){
-            mDataset.removeAll(mDataset);
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    notifyDataSetChanged();
-                }
-            });
+            final int mDatasetSize = mDataset.size();
+
+            //Check if the mDataset contains data, if so remove otherwise do nothing (prevents crash)
+            if (mDatasetSize > 0){
+                mDataset.removeAll(mDataset);
+
+                //Notify the view that the dataset has changed
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        notifyDataSetChanged();
+                    }
+                });
+            }
 
         }
 
@@ -153,16 +175,12 @@ public class SearchFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            final Artist artist = mDataset.get(position);
-
-            if(artist.images.size() > 0){
-                int imageToUse = artist.images.size() - 1;
-                String imageUrl = artist.images.get(imageToUse).url;
+            final SearchArtist artist = mDataset.get(position);
+            String imageUrl = artist.getImageUrl();
+            if(imageUrl != null){
                 Picasso.with(getActivity()).load(imageUrl).into(holder.artistPicture);
             }
-
-            holder.artistName.setText(artist.name);
-
+            holder.artistName.setText(artist.getName());
         }
 
         @Override
@@ -170,4 +188,5 @@ public class SearchFragment extends Fragment {
             return mDataset.size();
         }
     }
+
 }
